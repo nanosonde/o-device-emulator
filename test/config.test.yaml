@@ -1,0 +1,24 @@
+# Test-oriented configuration for local/manual runs against the lab
+# controller (see tools/docker-compose.yml). Not used by automated tests
+# (those construct config dicts in-process) - this is for manual
+# `--dry-run`/live testing convenience.
+
+controller_url: https://127.0.0.1:8043
+
+state_file: data/test_device_state.json
+persist: false
+
+services:
+  discovery_port: 29810
+  discovery_interval: 5
+  discovery_broadcast: false
+
+devices:
+  - name: test-eap-01
+    type: ap
+    model: EAP245
+    model_version: "3.0"
+    hardware_version: "3.0"
+    firmware: "5.1.0 Build 20230101 Rel.12345"
+    mac: 02:15:6D:00:01:01
+    ip: 192.168.56.101

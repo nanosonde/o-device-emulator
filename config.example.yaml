@@ -1,0 +1,62 @@
+# o-device-emulator configuration
+#
+# Copy this file to config.yaml and adjust for your lab environment, then run:
+#   .venv/bin/python device_emulator_daemon.py --config config.yaml --dry-run
+#
+# IMPORTANT: only the UDP discovery announce (port 29810) is confirmed working
+# against a real controller (see doc/DEVICE_PROTOCOL.md). The subsequent
+# adoption/inform exchange over the TCP channels is not yet implemented.
+# Announcing a device here makes it show up as "discovered" (adoptable) in the
+# controller, but completing adoption is not yet supported.
+
+# The controller's management URL. Its host/port are used both to fetch the
+# controller's ID (GET <controller_url>/api/info, unauthenticated) and as the
+# destination for discovery announces. Must NOT be loopback - use a real
+# LAN/host-only interface address reachable from wherever this daemon runs.
+controller_url: https://192.168.56.1:8043
+
+# Optional: persist device identity/uptime across daemon restarts.
+state_file: data/device_state.json
+persist: true
+
+services:
+  discovery_port: 29810
+  discovery_interval: 10          # seconds between announces
+  # Bind the announce socket to a specific host-facing source IP on
+  # multi-homed hosts. Leave unset to let the OS choose.
+  # discovery_bind_ip: 192.168.56.3
+  # Send to the limited broadcast address instead of directly to
+  # controller_url's host. Only useful if the controller's address isn't
+  # known ahead of time; direct unicast (the default) is simpler for lab use
+  # and is what was used during protocol verification.
+  discovery_broadcast: false
+
+devices:
+  - name: lab-eap-01
+    type: ap
+    model: EAP245
+    model_version: "3.0"
+    hardware_version: "3.0"
+    firmware: "5.1.0 Build 20230101 Rel.12345"
+    mac: 02:15:6D:00:00:20
+    ip: 192.168.56.53
+
+  - name: lab-switch-01
+    type: switch
+    model: TL-SG3210
+    model_version: "1.0"
+    hardware_version: "1.0"
+    firmware: "1.0.0 Build 20230101 Rel.12345"
+    mac: 02:15:6D:00:00:10
+    ip: 192.168.56.60
+    port_num: 10
+
+  - name: lab-gateway-01
+    type: gateway
+    model: ER605
+    model_version: "1.0"
+    hardware_version: "1.0"
+    firmware: "1.0.0 Build 20230101 Rel.12345"
+    mac: 02:15:6D:00:00:30
+    ip: 192.168.56.70
+    port_num: 5
