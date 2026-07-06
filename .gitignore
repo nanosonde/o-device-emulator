@@ -1,0 +1,29 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+build/
+dist/
+
+# Local config copy (see config.example.yaml)
+config.yaml
+
+# Runtime data (see data/ policy in README)
+data/*
+!data/.gitkeep
+
+# Local research area: lab tooling, controller artifacts, and analysis notes.
+# Local-only, never committed.
+doc/research/
+
+# Editors / OS
+.vscode/
+.idea/
+*.swp
+.DS_Store
+
+# Test artifacts
+.pytest_cache/
+.ruff_cache/

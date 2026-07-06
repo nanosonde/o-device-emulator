@@ -1,0 +1,197 @@
+# o-device-emulator configuration
+#
+# Copy this file to config.yaml and adjust for your lab environment, then run:
+#   .venv/bin/python device_emulator_daemon.py --config config.yaml --dry-run
+#
+# The UDP discovery announce (port 29810) makes a device show up as adoptable
+# ("Pending") in the controller. With the `adopt:` block below enabled, the
+# emulator also drives the full adoption handshake over the TLS management
+# channel and keeps the device "Connected" with periodic INFORM heartbeats
+# (see doc/DEVICE_PROTOCOL.md §7). The full adoption path is confirmed for
+# access points, switches, gateways, and OLTs — each reported as compatible.
+
+# The controller's management URL. Its host/port are used both to fetch the
+# controller's ID (GET <controller_url>/api/info, unauthenticated) and as the
+# destination for discovery announces. Use a host/IP reachable from wherever
+# this daemon runs. For the local Docker Compose controller when this daemon
+# runs on the host, use https://127.0.0.1:8043; a separately hosted daemon
+# needs the Docker host's reachable LAN/host-only interface address instead.
+controller_url: https://192.168.56.1:8043
+
+# Optional: persist device identity/uptime across daemon restarts.
+state_file: data/device_state.json
+persist: true
+
+services:
+  discovery_port: 29810
+  discovery_interval: 10          # seconds between announces
+  # Bind the announce socket to a specific host-facing source IP on
+  # multi-homed hosts. Leave unset to let the OS choose.
+  # discovery_bind_ip: 192.168.56.3
+  # Send to the limited broadcast address instead of directly to
+  # controller_url's host. Only useful if the controller's address isn't
+  # known ahead of time; direct unicast (the default) is simpler for lab use
+  # and is what was used during protocol verification.
+  discovery_broadcast: false
+
+# Adoption over the TLS management channel. When enabled, devices announce as
+# adoptable; once an operator adopts one in the controller, the emulator
+# completes the handshake to "Connected" and holds it online. Access points,
+# switches, gateways, and OLTs are all supported (each reported as
+# compatible). The username / password must match what the operator enters
+# when adopting. The controller normally provisions the site's Device Account
+# during initial sync and the emulator learns it automatically. The optional
+# managed_username / managed_password values are fallback overrides for
+# controller variants that omit that initial userAccount payload.
+adopt:
+  enabled: false
+  username: admin
+  password: admin
+  # managed_username: admin
+  # managed_password: change-me       # Site Settings -> Device Account
+  port: 29814                     # management (adopt) TCP port
+  inform_interval: 10             # seconds between INFORM heartbeats once online
+
+
+devices:
+  # Keys common to every device entry:
+  #   name, mac, ip        - required (`ip` must be an explicit, non-loopback
+  #                          address; "auto" is not supported).
+  #   type                 - ap | switch | gateway | olt (default: ap).
+  #   model, model_version, hardware_version, firmware - identity strings.
+  #   country_code         - numeric region code reported as the discovery /
+  #                          adopt `customizeRegion` (default 0).
+  #   uplink               - name of the upstream device (topology parent).
+  #   uplink_port          - port on the upstream device this one plugs into
+  #                          (optional - auto-assigned if omitted).
+  #   local_uplink_port    - this device's own port facing the upstream
+  #                          device (optional, default 1).
+  - name: lab-eap-01
+    type: ap
+    model: EAP245
+    model_version: "3.0"
+    hardware_version: "3.0"
+    firmware: "5.1.0 Build 20230101 Rel.12345"
+    mac: 02:15:6D:00:00:20
+    ip: 192.168.56.53
+    # Number of Ethernet LAN ports (EAP245 has 1). Drives the portStatus /
+    # uplinkPortStatus INFORM sections for the AP's LAN ports.
+    lan_ports: 1
+    # Whether this AP is PoE-powered (a PoE consumer). When true the AP
+    # reports a poeInform section with its received power budget. Set to
+    # false for a DC-powered AP.
+    supports_poe: true
+    # Whether the AP uses a wireless mesh uplink (rather than wired). When
+    # false (the default) the mesh section reports an inactive/non-mesh
+    # state. Set to true for a mesh-extended AP.
+    wireless_uplink: false
+    # Number of simulated Wi-Fi clients to generate for this AP, 0-5
+    # (default 5). This is an emulator simulation input only: the SSID each
+    # client reports comes solely from the controller's SET push, never from
+    # this config.
+    wireless_client_count: 5
+    # Wire the AP under the switch so it appears connected in the topology map.
+    # `uplink` is the name of the upstream device; `uplink_port` is the port on
+    # that upstream device this one plugs into (optional - auto-assigned if
+    # omitted). Leave `uplink` unset for a standalone device.
+    uplink: lab-switch-01
+    uplink_port: 8
+
+  - name: lab-switch-01
+    type: switch
+    model: TL-SG3210
+    model_version: "1.0"
+    hardware_version: "1.0"
+    firmware: "1.0.0 Build 20230101 Rel.12345"
+    mac: 02:15:6D:00:00:10
+    ip: 192.168.56.60
+    port_num: 10
+    # The switch plugs into the gateway (topology root).
+    uplink: lab-gateway-01
+    uplink_port: 5
+
+  # ── Gateway multi-model profile system ──────────────────────────────
+  # The `model` config key selects the negotiation profile, which controls
+  # PROTOCOL_VERSION, COMPONENTS_V2, DEV_CAP, and DEVICE_INFO_TEMPLATE.
+  # Supported models:
+  #   ER605  (default) — wired VPN gateway, 5 ports, no LTE/SD-WAN.
+  #   ER706W — LTE + VPN gateway with integrated Wi-Fi 5 radio.
+  #   ER7206 — SD-WAN + multi-WAN load-balancing gateway, 9 ports incl. SFP.
+  #   ER8411 — high-end dual-WAN gateway, 9 ports incl. dual 10G SFP.
+  # Each profile exposes capability flags (SUPPORT_LTE, SUPPORT_SDWAN,
+  # SUPPORT_DISCRETE_WAN, SUPPORT_WAN_LOAD_BALANCE, SUPPORT_POE) that the
+  # emulator consults at runtime to decide which INFORM sections to emit
+  # (sdwan, virtualWanInfo, lte, poe, etc.). Unrecognized models fall back
+  # to the ER605 profile.
+  # ────────────────────────────────────────────────────────────────────
+
+  - name: lab-gateway-01
+    type: gateway
+    model: ER605
+    model_version: "1.0"
+    hardware_version: "1.0"
+    firmware: "1.0.0 Build 20230101 Rel.12345"
+    mac: 02:15:6D:00:00:30
+    ip: 192.168.56.70
+    port_num: 5
+    # Whether this gateway model has an integrated radio (reported in the
+    # discovery body). 0 for the wired-only ER605.
+    wireless: 0
+
+  # ER706W — LTE + VPN gateway. Supports an integrated 4G LTE modem and
+  # higher VPN tunnel capacities than the ER605. Also has Wi-Fi 5.
+  - name: lab-gateway-02
+    type: gateway
+    model: ER706W
+    model_version: "1.0"
+    hardware_version: "1.0"
+    firmware: "1.0.0 Build 20240101 Rel.12345"
+    mac: 02:15:6D:00:00:31
+    ip: 192.168.56.71
+    port_num: 5
+    wireless: 1
+
+  # ER7206 — SD-WAN gateway. Supports SD-WAN, multi-WAN load balancing, and
+  # has 9 ports including SFP.
+  - name: lab-gateway-03
+    type: gateway
+    model: ER7206
+    model_version: "1.0"
+    hardware_version: "1.0"
+    firmware: "1.0.0 Build 20240101 Rel.12345"
+    mac: 02:15:6D:00:00:32
+    ip: 192.168.56.72
+    port_num: 9
+
+  # ER8411 — high-end gateway. Supports dual 10G SFP ports, SD-WAN,
+  # multi-WAN load balancing, and the maximum VPN tunnel capacities.
+  - name: lab-gateway-04
+    type: gateway
+    model: ER8411
+    model_version: "1.0"
+    hardware_version: "1.0"
+    firmware: "1.0.0 Build 20240101 Rel.12345"
+    mac: 02:15:6D:00:00:33
+    ip: 192.168.56.73
+    port_num: 9
+
+  # A PON optical line terminal (OLT) — the headend of a GPON/EPON PON; it
+  # manages a tree of ONUs off its PON ports. The OLT is a V2 wired device that
+  # advertises ECSP 2.2 and reuses the AP-style long-name deviceInfo. Its
+  # discovery, adoption, and INFORM flow are validated against a live
+  # controller. See `pon_port_count` / `lag_count` / `oem_id` / `hw_id` for
+  # the OLT-specific identity fields.
+  - name: lab-olt-01
+    type: olt
+    model: DS-P7001-08
+    model_version: "1.0"
+    hardware_version: "1.0"
+    firmware: "1.0.0 Build 20230101 Rel.12345"
+    mac: 02:15:6D:00:00:40
+    ip: 192.168.56.80
+    pon_port_count: 8
+    lag_count: 0
+    # The OLT management uplink plugs into the switch; its PON ports serve
+    # downstream ONUs and are not represented as separate emulator devices.
+    uplink: lab-switch-01
+    uplink_port: 9

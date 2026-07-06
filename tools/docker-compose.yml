@@ -1,0 +1,56 @@
+# Network controller, used ONLY as a local lab-testing target for
+# o-device-emulator. Not part of the emulator runtime itself.
+#
+# Usage:
+#   cd tools && docker compose up -d
+#   docker compose logs -f lab-controller
+#
+# Web UI:  https://<host-ip>:8043
+# Ports below match doc/DEVICE_PROTOCOL.md (current controller port map).
+services:
+  lab-controller:
+    # Validated against both controller v5.15 (ECSP 1.3.7) and v6.2 (ECSP
+    # 1.7.3). Pin the major.minor line you want to test; ":6.2" is the current
+    # latest. ":latest" or ":5.15" also work.
+    image: mbentley/omada-controller:6.2
+    container_name: lab-controller
+    restart: unless-stopped
+    environment:
+      TZ: Etc/UTC
+      MANAGE_HTTP_PORT: 8088
+      MANAGE_HTTPS_PORT: 8043
+      PORTAL_HTTP_PORT: 8088
+      PORTAL_HTTPS_PORT: 8843
+      PORT_DISCOVERY: 29810
+      PORT_ADOPT_V1: 29812
+      PORT_UPGRADE_V1: 29813
+      PORT_MANAGER_V1: 29811
+      PORT_MANAGER_V2: 29814
+      PORT_TRANSFER_V2: 29815
+      PORT_RTTY: 29816
+      PORT_DEVICE_MONITOR: 29817
+      SHOW_SERVER_LOGS: "true"
+      SHOW_MONGODB_LOGS: "false"
+    ports:
+      - "8088:8088/tcp"
+      - "8043:8043/tcp"
+      - "8843:8843/tcp"
+      - "29810:29810/udp"
+      # Publish the v2 management (adopt) port so the emulator daemon (running
+      # on the host) can open its TLS client connection to the controller's
+      # adopt listener to drive the handshake. The emulator is the TLS client
+      # here; it connects OUT to controller_host:29814.
+      - "29814:29814/tcp"
+      # NOTE: the other manager/adopt/upgrade/transfer/rtty TCP ports
+      # (29811-29813, 29815-29817) remain intentionally NOT published; the
+      # adopt handshake only needs 29814, and leaving the rest unpublished
+      # frees those port numbers on the host.
+    volumes:
+      - controller-data:/opt/tplink/EAPController/data
+      - controller-work:/opt/tplink/EAPController/work
+      - controller-logs:/opt/tplink/EAPController/logs
+
+volumes:
+  controller-data:
+  controller-work:
+  controller-logs:
