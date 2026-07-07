@@ -78,24 +78,14 @@ class Device:
         raise NotImplementedError
 
     def manage_device_info(self) -> dict[str, Any]:
-        """The deviceInfo object sent over the management channel during and
-        after adoption (negotiation + INFORM heartbeats).
+        """The ``deviceInfo`` object sent over the management channel during
+        and after adoption (negotiation + INFORM heartbeats).
 
-        CONFIRMED for access points; subclasses may override to adjust
-        per-type fields.
+        The shape is device-type-specific (access points use a long-name field
+        set; switches/gateways use short names), so concrete device classes
+        implement it.
         """
-        return {
-            "name": self.name,
-            "model": self.identity.model,
-            "modelVersion": self.identity.model_version,
-            "firmwareVersion": self.identity.firmware_version,
-            "hardwareVersion": self.identity.hardware_version,
-            "upTime": str(self.uptime_seconds),
-            "cpuUti": 5,
-            "memUti": 30,
-            "wirelessLinked": False,
-            "p2p": False,
-        }
+        raise NotImplementedError
 
     def manage_components_v2(self) -> dict[str, str]:
         """The component manifest ({name: version}) reported during
@@ -108,9 +98,11 @@ class Device:
     def build_manage_negotiation_body(self, controller_id: str) -> dict[str, Any]:
         """The DEVICE_NEGOTIATION body sent over the management channel.
 
-        The base (access-point) shape carries the device info, the component
-        manifest, and empty capability placeholders. Switches and gateways
-        override this with their own device-info/capability shapes.
+        This default is the access-point ("wireless") shape: the device info,
+        the component manifest, and empty capability placeholders
+        (``channelInfo``/``radioCap``/``devCap``). Wired devices (switches and
+        gateways) override this with their own capability descriptor - see
+        ``WiredDevice``.
         """
         from ..protocol import adoption
 

@@ -1,4 +1,4 @@
-"""Component manifest reported by an access point during negotiation.
+"""Negotiation profile for an emulated access point (modelled on EAP245 v3.0).
 
 The controller flags a device as "not compatible" (and shows a warning) when
 the device reports an empty component set: the compatibility check builds a
@@ -6,14 +6,19 @@ component descriptor from the negotiation's `components_v2` map and treats an
 empty result as invalid. Reporting a realistic, non-empty component manifest
 makes the controller consider the device compatible.
 
-This map mirrors the component/version set an EAP245(US) v3.0 reports (the
-component names are generic networking feature identifiers). It is used as the
-default `components_v2` for emulated access points.
+`COMPONENTS_V2` mirrors the component/version set an EAP245(US) v3.0 reports
+(the component names are generic networking feature identifiers). `PROTOCOL_VERSION`
+is the ECSP protocol version the controller expects for an access point
+(EcspFirstVersionEnum V2 EAP "fit" version); a lower minor is flagged as
+incompatible. Both are used by EapDevice.
 """
 from __future__ import annotations
 
+# ECSP protocol version advertised in header.version for access points.
+PROTOCOL_VERSION = "2.3.0"
+
 # Access-point component manifest: {component name: component version}.
-EAP_COMPONENTS_V2: dict[str, str] = {
+COMPONENTS_V2: dict[str, str] = {
     "abnormalDetect": "1.0",
     "acl": "2.1",
     "bSteerInform": "1.0",

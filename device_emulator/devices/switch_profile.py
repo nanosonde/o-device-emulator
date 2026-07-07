@@ -2,8 +2,16 @@
 
 Component manifest, capability descriptor and static device-info fields the
 controller expects during adoption. Dynamic fields (mac/ip/versions/uptime)
-are filled in by SwitchDevice at runtime."""
+are filled in by SwitchDevice at runtime.
+
+Generated from the controller's model template
+(initDeviceModelTemplateData.json -> deviceModelTemplates[].adopt_resp).
+"""
 from __future__ import annotations
+
+# ECSP protocol version advertised in header.version for switches
+# (EcspFirstVersionEnum V2 switch "fit" version).
+PROTOCOL_VERSION = "2.2.0"
 
 COMPONENTS_V2 = {   'acl': '1.2',
     'arp': '1.0',

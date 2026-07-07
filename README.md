@@ -33,7 +33,9 @@ cp config.example.yaml config.yaml
 - `device_emulator/protocol/`: packet framing, message envelope, discovery
   body builders, management-channel handshake bodies, and the device auth
   calculation.
-- `device_emulator/devices/`: base, access point, switch, gateway, registry.
+- `device_emulator/devices/`: device model (`base` + `wired` bases; `eap`,
+  `switch`, `gateway` types; `registry`), plus per-type negotiation profiles
+  (`eap_profile`, `switch_profile`, `gateway_profile`).
 - `device_emulator/services/`: discovery announce, TLS management client,
   controller info client, runner.
 - `device_emulator/state.py`: persistence helpers.

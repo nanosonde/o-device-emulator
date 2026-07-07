@@ -6,8 +6,8 @@ from typing import Any
 
 from ..protocol import constants
 from ..protocol.discovery import build_gateway_discovery_body
-from .base import Device, format_uptime
 from . import gateway_profile
+from .wired import WiredDevice
 
 
 def _derive_port_macs(mac: str, count: int) -> list[dict[str, Any]]:
@@ -26,18 +26,19 @@ def _derive_port_macs(mac: str, count: int) -> list[dict[str, Any]]:
 
 
 @dataclass
-class GatewayDevice(Device):
+class GatewayDevice(WiredDevice):
     port_num: int = 5
     wireless: int = 0
     certified_version: str = "1.0"
+    # Gateways report modest default utilisation.
     cpu_util: int = 1
     mem_util: int = 32
 
+    profile = gateway_profile
+
     def __post_init__(self) -> None:
         self.device_type = constants.DEVICE_TYPE_GATEWAY
-        # Gateways are classified at ECSP protocol version 2.2 (see
-        # doc/DEVICE_PROTOCOL.md §7.5).
-        self.protocol_version = "2.2.0"
+        self._apply_wired_profile()
 
     def build_discovery_body(self) -> dict[str, Any]:
         assert self.controller_id is not None
@@ -55,35 +56,10 @@ class GatewayDevice(Device):
             country_code=self.country_code,
         )
 
-    def manage_device_info(self) -> dict[str, Any]:
-        info = dict(gateway_profile.DEVICE_INFO_TEMPLATE)
-        info.update(
-            {
-                "model": self.identity.model,
-                "modelVer": self.identity.model_version,
-                "fwVer": self.identity.firmware_version,
-                "hwVer": f"{self.identity.model} v{self.identity.hardware_version}",
-                "ip": self.ip,
-                "lanMac": self.mac,
-                "wanDefaultMacs": _derive_port_macs(self.mac, max(0, self.port_num - 1)),
-                "time": format_uptime(self.uptime_seconds),
-                "cu": self.cpu_util,
-                "mu": self.mem_util,
-            }
-        )
-        return info
-
-    def manage_components_v2(self) -> dict[str, str]:
-        return dict(gateway_profile.COMPONENTS_V2)
-
-    def build_manage_negotiation_body(self, controller_id: str) -> dict[str, Any]:
+    def _extra_device_info(self) -> dict[str, Any]:
+        # Gateways report a "<model> v<hw>" hwVer plus MAC/port identity fields.
         return {
-            "key": "",
-            "configVersion": "0",
-            "deviceInfo": self.manage_device_info(),
-            "controllerSetting": {"controllerId": controller_id},
-            "components": "",
-            "components_v2": self.manage_components_v2(),
-            "devCap": dict(gateway_profile.DEV_CAP),
-            "deviceMisc": dict(gateway_profile.DEVICE_MISC),
+            "hwVer": f"{self.identity.model} v{self.identity.hardware_version}",
+            "lanMac": self.mac,
+            "wanDefaultMacs": _derive_port_macs(self.mac, max(0, self.port_num - 1)),
         }

@@ -2,8 +2,16 @@
 
 Component manifest, capability descriptor and static device-info fields the
 controller expects during adoption. Dynamic fields (mac/ip/versions/uptime)
-are filled in by GatewayDevice at runtime."""
+are filled in by GatewayDevice at runtime.
+
+Generated from the controller's model template
+(initDeviceModelTemplateData.json -> deviceModelTemplates[].adopt_resp).
+"""
 from __future__ import annotations
+
+# ECSP protocol version advertised in header.version for gateways
+# (EcspFirstVersionEnum V2 gateway "fit" version).
+PROTOCOL_VERSION = "2.2.0"
 
 COMPONENTS_V2 = {   'abnormalDetect': '1.1',
     'abnormalDt': '1.0',

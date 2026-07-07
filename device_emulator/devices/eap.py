@@ -1,13 +1,13 @@
 """Emulated access point."""
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any
 
 from ..protocol import constants
 from ..protocol.discovery import build_ap_discovery_body
+from . import eap_profile
 from .base import Device
-from .eap_components import EAP_COMPONENTS_V2
 
 
 @dataclass
@@ -18,8 +18,10 @@ class EapDevice(Device):
 
     def __post_init__(self) -> None:
         self.device_type = constants.DEVICE_TYPE_AP
+        self.protocol_version = eap_profile.PROTOCOL_VERSION
 
     def manage_device_info(self) -> dict[str, Any]:
+        # Access points use the long-name deviceInfo field set.
         return {
             "name": self.name,
             "model": self.identity.model,
@@ -34,7 +36,7 @@ class EapDevice(Device):
         }
 
     def manage_components_v2(self) -> dict[str, str]:
-        return dict(EAP_COMPONENTS_V2)
+        return dict(eap_profile.COMPONENTS_V2)
 
     def build_discovery_body(self) -> dict[str, Any]:
         assert self.controller_id is not None
