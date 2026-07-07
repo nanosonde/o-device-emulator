@@ -1,13 +1,18 @@
-"""Orchestrates per-device services (currently: discovery announce loops)."""
+"""Orchestrates per-device services: discovery announce loops and, when
+adoption is enabled, the TLS management channel that drives a device to
+CONNECTED and keeps it online."""
 from __future__ import annotations
 
 import logging
+import threading
 from dataclasses import dataclass, field
-from typing import Optional
+from typing import Any, Optional
 
 from ..devices.base import Device
+from ..protocol import constants
 from .controller_client import ControllerInfoError, fetch_controller_id
 from .discovery import DiscoveryService, DiscoveryServiceConfig
+from .manage import ManageService
 
 logger = logging.getLogger(__name__)
 
@@ -21,9 +26,20 @@ class Runner:
     discovery_bind_ip: Optional[str] = None
     discovery_broadcast: bool = False
 
+    # Adoption (management channel) settings.
+    adopt_enabled: bool = False
+    adopt_username: str = "admin"
+    adopt_password: str = "admin"
+    adopt_port: int = constants.DEFAULT_ADOPT_TCP_PORT
+    inform_interval: float = constants.DEFAULT_INFORM_INTERVAL_SECONDS
+
     _devices: list[Device] = field(default_factory=list)
     _services: list[DiscoveryService] = field(default_factory=list)
+    _discovery_by_mac: dict[str, DiscoveryService] = field(default_factory=dict)
+    _manage_by_mac: dict[str, ManageService] = field(default_factory=dict)
     _controller_id: Optional[str] = None
+    _lock: threading.Lock = field(default_factory=threading.Lock)
+    _stopped: bool = False
 
     @property
     def devices(self) -> list[Device]:
@@ -52,31 +68,87 @@ class Runner:
 
         summaries = []
         for device in self._devices:
-            device.controller_id = controller_id
+            device.controller_id = (
+                constants.FACTORY_CONTROLLER_ID if self.adopt_enabled else controller_id
+            )
             message = device.build_discovery_message()
+            adopt_note = " (adoptable)" if self.adopt_enabled else ""
             summaries.append(
                 f"{device.name} ({device.device_type}, mac={device.mac}, ip={device.ip}): "
-                f"{len(message.to_json_bytes())} byte discovery body OK"
+                f"{len(message.to_json_bytes())} byte discovery body OK{adopt_note}"
             )
         return summaries
 
+    def _make_discovery(self, device: Device) -> DiscoveryService:
+        config = DiscoveryServiceConfig(
+            controller_host=self.controller_host,
+            port=self.discovery_port,
+            interval_seconds=self.discovery_interval,
+            bind_ip=self.discovery_bind_ip,
+            broadcast=self.discovery_broadcast,
+        )
+        on_pre_adopt = self._on_pre_adopt if self.adopt_enabled else None
+        return DiscoveryService(device, config, on_pre_adopt=on_pre_adopt)
+
+    def _on_pre_adopt(self, device: Device, body: dict[str, Any]) -> None:
+        """Controller answered a discovery announce with a pre-adopt reply:
+        stop announcing (further announces abort adoption) and open the
+        management channel."""
+        with self._lock:
+            discovery = self._discovery_by_mac.pop(device.mac, None)
+            if discovery is not None:
+                discovery.stop(timeout=0.1)
+            adopt_port = int(body.get("adoptPort") or self.adopt_port)
+            manage = ManageService(
+                device,
+                controller_host=self.controller_host,
+                controller_id=self.resolve_controller_id(),
+                username=self.adopt_username,
+                password=self.adopt_password,
+                adopt_port=adopt_port,
+                inform_interval=self.inform_interval,
+                on_closed=self._on_manage_closed,
+            )
+            self._manage_by_mac[device.mac] = manage
+        logger.info("adopting %s via management channel on port %s", device.name, adopt_port)
+        manage.start()
+
+    def _on_manage_closed(self, device: Device) -> None:
+        """Management channel ended: resume discovery so the device can be
+        re-adopted."""
+        with self._lock:
+            self._manage_by_mac.pop(device.mac, None)
+            if self._stopped:
+                return
+            device.controller_id = constants.FACTORY_CONTROLLER_ID
+            discovery = self._make_discovery(device)
+            self._discovery_by_mac[device.mac] = discovery
+        logger.info("management channel for %s ended; resuming discovery", device.name)
+        discovery.start()
+
     def start(self) -> None:
+        self._stopped = False
         controller_id = self.resolve_controller_id()
         for device in self._devices:
-            device.controller_id = controller_id
-            config = DiscoveryServiceConfig(
-                controller_host=self.controller_host,
-                port=self.discovery_port,
-                interval_seconds=self.discovery_interval,
-                bind_ip=self.discovery_bind_ip,
-                broadcast=self.discovery_broadcast,
+            device.controller_id = (
+                constants.FACTORY_CONTROLLER_ID if self.adopt_enabled else controller_id
             )
-            service = DiscoveryService(device, config)
-            service.start()
+            service = self._make_discovery(device)
             self._services.append(service)
-            logger.info("started discovery service for %s", device.name)
+            self._discovery_by_mac[device.mac] = service
+            service.start()
+            logger.info(
+                "started discovery service for %s%s",
+                device.name,
+                " (adoptable)" if self.adopt_enabled else "",
+            )
 
     def stop(self) -> None:
-        for service in self._services:
+        self._stopped = True
+        for manage in list(self._manage_by_mac.values()):
+            manage.stop()
+        self._manage_by_mac.clear()
+        for service in list(self._discovery_by_mac.values()):
             service.stop()
         self._services.clear()
+        self._discovery_by_mac.clear()

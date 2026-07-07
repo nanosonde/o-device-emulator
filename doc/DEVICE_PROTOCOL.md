@@ -38,7 +38,7 @@ A device announces itself over **UDP** on port 29810. The controller records
 it and — depending on what the device reports — either files it as
 "managed by another controller" or offers it for **adoption**. Once an
 operator starts adoption, the controller drives the rest of the exchange over
-the **TCP management channel** (port 29814).
+the **TLS management channel** (port 29814).
 
 ### 1.1 Ports
 
@@ -70,20 +70,19 @@ two top-level objects:
 { "header": { ... }, "body": { ... } }
 ```
 
-### 2.1 Wire framing — CONFIRMED (UDP), PROVISIONAL (TCP)
+### 2.1 Wire framing — CONFIRMED (UDP and TLS management channel)
 
 ```
 bytes 0-3 : total JSON length, big-endian uint32
 bytes 4.. : UTF-8 JSON document (the envelope above)
 ```
 
-No application-layer encryption was observed on the discovery channel — it is
-**plaintext JSON**. The TCP management channel uses the same 4-byte-length +
-JSON framing; a plain (unencrypted) connection to port 29814 is recognized by
-the controller and advances a pending device's internal state (see §7), so no
-application-layer cipher is required to begin the TCP exchange. The
-sensitive management UI/API rides on HTTPS (8043), which already provides
-transport security.
+No application-layer encryption is used on the discovery channel — it is
+**plaintext JSON** over UDP. The current management channel (port 29814) uses
+the **same** 4-byte-length + JSON framing, but inside a **TLS** stream: the
+port presents a vendor certificate (CN=localhost) and a plain-TCP connection
+is silently dropped, so the device must wrap the socket in TLS (see §7.2). No
+client certificate is required.
 
 ---
 
@@ -116,8 +115,9 @@ device types, not covered here.)
 
 ### 3.2 `type` — message type codes
 
-Only `DISCOVERY` (1) is CONFIRMED end-to-end. The rest are documented for
-completeness (PROVISIONAL) and reflect the controller's known message set:
+`DISCOVERY` (1) and the full management-channel handshake (§7) are CONFIRMED
+end-to-end. The remaining codes are documented for completeness and reflect
+the controller's known message set:
 
 | Name | Value | Purpose |
 |---|---:|---|
@@ -133,7 +133,7 @@ completeness (PROVISIONAL) and reflect the controller's known message set:
 | `FORGET_REQUEST` / `FORGET_RESPONSE` | 16384 / 20480 | "Forget" (reset) the device |
 | `UPGRADE_REQUEST` / `UPGRADE_RESPONSE` | 32768 / 65536 | Firmware upgrade |
 | `REBUILD_REQUEST` / `REBUILD_RESPONSE` | 36864 / 40960 | Config rebuild |
-| `DEVICE_VERIFY_INFO` / `..._RESPONSE` | 0x100001 / 0x100002 | Device identity verification (part of the TCP adopt handshake) |
+| `DEVICE_VERIFY_INFO` / `..._RESPONSE` | 0x100001 / 0x100002 | Device identity verification (part of the TLS adopt handshake, §7) |
 | `DEVICE_NEGOTIATION` / `SYSTEM_NEGOTIATION` | 0x100004 / 0x100005 | Capability negotiation |
 | `REPORT` | 0x150000 | Telemetry upload |
 
@@ -294,41 +294,84 @@ adoptable).
 
 ---
 
-## 7. Adoption over TCP (port 29814) — PARTIALLY CONFIRMED / OPEN
+## 7. Adoption over the TLS management channel (port 29814) — CONFIRMED
 
-Once an operator triggers adoption, the following has been observed:
+Once an operator triggers adoption, the device is driven all the way to
+**Connected** over the management channel. The full sequence below was
+validated live end-to-end (the emulated device reaches the controller's
+"Connected" status and stays online).
 
-1. **CONFIRMED:** while the device keeps sending its periodic discovery
-   announce, the controller starts **replying over UDP** with a
-   `PRE_ADOPT_REQUEST` (`type: 2`) whose body tells the device where to
-   connect:
-   ```json
-   {
-     "header": { "version": "2.0.0", "mac": "...", "type": 2, "error": 0,
-                 "dest": "<controller ID>" },
-     "body": { "adoptPort": 29814 }
-   }
-   ```
-2. **CONFIRMED:** opening a plain TCP connection to the indicated port
-   (29814) and sending a length-prefixed JSON message is recognized by the
-   controller — it matches the connection to the pending device and advances
-   its internal state (from "pending" to an "adopting / pre-adopt" phase).
-   This confirms the TCP channel uses the same framing and envelope as the
-   UDP channel and needs no application-layer encryption to begin.
-3. **OPEN:** the exact message sequence that carries the device through
-   adoption to a fully online state is not yet worked out. The controller's
-   message set includes a device-verification step
-   (`DEVICE_VERIFY_INFO`/`DEVICE_VERIFY_RESPONSE`, which carry a random
-   verification key), capability negotiation
-   (`DEVICE_NEGOTIATION`/`SYSTEM_NEGOTIATION`), an initial config sync
-   (`INIT_SYNC`), and then the steady-state inform loop
-   (`INFORM_REQUEST`/`INFORM_RESPONSE`). Completing this is future work.
+### 7.1 Pre-adopt trigger (UDP)
 
-**Summary of the confirmed lifecycle so far:**
-discovery announce → **PENDING** (with sentinel controller ID) → operator
-adopts → **ADOPTING** → controller pushes `adoptPort` over UDP → device
-connects TCP 29814 → controller advances to the pre-adopt phase → *(remaining
-verify / negotiate / sync / inform steps: OPEN)*.
+While the device keeps sending its periodic discovery announce, the controller
+answers the device's *next* announce over **UDP** (to the announce's source
+address/port) with a `PRE_ADOPT_REQUEST` (`type: 2`) whose body names the port
+to connect to:
+```json
+{
+  "header": { "version": "2.0.0", "mac": "...", "type": 2, "error": 0,
+              "dest": "<controller ID>" },
+  "body": { "adoptPort": 29814 }
+}
+```
+The device must keep the same UDP socket open (source port stable) to receive
+this reply. Once received, the device should **stop announcing** — more than a
+few discovery announces while the controller is adopting cause the adoption to
+be aborted.
+
+### 7.2 TLS transport
+
+The management port (29814) is presented **behind TLS**. The server offers a
+vendor certificate (CN=localhost) and does **not** request a client
+certificate. A plain-TCP connection is accepted at the socket layer but then
+silently dropped, so the device must wrap the connection in TLS (no
+verification needed for a lab controller; use `server_hostname="localhost"`).
+The same 4-byte length prefix + UTF-8 JSON `{header, body}` framing is used
+inside the TLS stream. The management-channel `header` is minimal:
+`{version, mac, type, device, error, seq}` (no `timestamp`/`verCap`).
+
+### 7.3 Handshake sequence — CONFIRMED
+
+Device-initiated messages carry an incrementing `seq`; replies to
+controller-initiated messages echo the received `seq`.
+
+| # | Direction | `type` | Purpose |
+|---|-----------|--------|---------|
+| 1 | device → | `PRE_CONNECT_INFO` (3) | `{needUsername:true, rebuild:0}` |
+| 2 | ← device | `PRE_CONNECT_INFO_RESPONSE` (0x100000) | `{randomKeyForDeviceVerify, username}` |
+| 3 | device → | `DEVICE_VERIFY_INFO` (0x100001) | `{auth, randomKeyForSystemVerify}` |
+| 4 | ← device | `DEVICE_VERIFY_RESPONSE` (0x100002) | `error==0` ⇒ controller authenticated the device (its body `auth` mutually authenticates the controller) |
+| 5 | device → | `SYSTEM_VERIFY_RESULT` (0x100003) | `{}` |
+| 6 | ← device | `VERIFY_RESULT_ACK` (0x100009) | mutual verification complete |
+| 7 | device → | `DEVICE_NEGOTIATION` (0x100004) | capabilities + `controllerSetting.controllerId` (the **real** controller ID) |
+| 8 | ← device | `SYSTEM_NEGOTIATION` (0x100005) | controller's negotiation reply |
+| 9 | device → | `INIT_SYNC_RESULT` (0x100006) | `{}` (echo seq) |
+| 10 | ← device | `INIT_SYNC_RESULT_ACK` (0x10000A) | device transitions to **Connected** |
+| 11 | device → | `INFORM_REQUEST` (256) every ~10 s | `{deviceInfo, configVersion}` heartbeat — keeps the device online |
+
+During the connected phase the controller may also send `SET_REQUEST` (4096),
+`GET_REQUEST` (24576), and `NOTIFY_REQUEST` (80 / 0x100007); the device
+acknowledges each with the matching empty response
+(`SET_RESPONSE` 8192 / `GET_RESPONSE` 28672 / `NOTIFY_REPLY` 144 / 0x100008),
+echoing the request `seq`.
+
+### 7.4 Device authentication — CONFIRMED
+
+The `auth` token in step 3 proves the device knows the management credential:
+```
+auth = SHA256( SHA256(username + MD5(password)) + randomKeyForDeviceVerify )
+```
+Every intermediate hash is rendered as an **UPPERCASE** hex string before being
+fed into the next hash (the controller's implementation uppercases its hex, and
+because the digests are hash *inputs*, casing changes the result). The default
+device credential is `admin` / `admin`; the username/password must match what
+the operator supplies when adopting.
+
+**Summary of the confirmed lifecycle:**
+discovery announce (sentinel controller ID) → **PENDING** → operator adopts →
+**ADOPTING** → controller pushes `adoptPort` over UDP → device opens TLS to
+29814 → pre-connect → verify (mutual) → negotiate → init-sync →
+**CONNECTED** → periodic `INFORM_REQUEST` keeps it online.
 
 ---
 
@@ -339,15 +382,26 @@ DISCOVERY_UDP_PORT       = 29810
 MANAGER_V1_TCP_PORT      = 29811   # legacy
 ADOPT_V1_TCP_PORT        = 29812   # legacy
 UPGRADE_V1_TCP_PORT      = 29813   # legacy
-MANAGER_V2_TCP_PORT      = 29814   # current
+MANAGER_V2_TCP_PORT      = 29814   # current (TLS management channel)
 TRANSFER_V2_TCP_PORT     = 29815
 RTTY_TCP_PORT            = 29816
 DEVICE_MONITOR_TCP_PORT  = 29817
 MGMT_HTTPS_PORT          = 8043
 MGMT_HTTP_PORT           = 8088
 
-MESSAGE_TYPE_DISCOVERY   = 1
-MESSAGE_TYPE_PRE_ADOPT   = 2
+MESSAGE_TYPE_DISCOVERY               = 1
+MESSAGE_TYPE_PRE_ADOPT_REQUEST       = 2
+MESSAGE_TYPE_PRE_CONNECT_INFO        = 3
+MESSAGE_TYPE_PRE_CONNECT_INFO_RESPONSE = 0x100000
+MESSAGE_TYPE_DEVICE_VERIFY_INFO      = 0x100001
+MESSAGE_TYPE_DEVICE_VERIFY_RESPONSE  = 0x100002
+MESSAGE_TYPE_SYSTEM_VERIFY_RESULT    = 0x100003
+MESSAGE_TYPE_DEVICE_NEGOTIATION      = 0x100004
+MESSAGE_TYPE_SYSTEM_NEGOTIATION      = 0x100005
+MESSAGE_TYPE_INIT_SYNC_RESULT        = 0x100006
+MESSAGE_TYPE_VERIFY_RESULT_ACK       = 0x100009
+MESSAGE_TYPE_INIT_SYNC_RESULT_ACK    = 0x10000A
+MESSAGE_TYPE_INFORM_REQUEST          = 256
 
 DEVICE_TYPE_AP           = "ap"
 DEVICE_TYPE_SWITCH       = "switch"
@@ -355,6 +409,10 @@ DEVICE_TYPE_GATEWAY      = "gateway"
 
 DISCOVERY_COOLDOWN_MS    = 20000   # announces older than this (by header.timestamp) are dropped
 FACTORY_CONTROLLER_ID    = "c21f969b5f03d33d43e04f8f136e7682"   # sentinel that marks a device adoptable
+MANAGE_TLS_SERVER_HOSTNAME = "localhost"
+
+# Connected-status code reported by the controller for a fully adopted device
+DEVICE_STATUS_CONNECTED  = 14
 ```
 
 ---
@@ -369,6 +427,7 @@ FACTORY_CONTROLLER_ID    = "c21f969b5f03d33d43e04f8f136e7682"   # sentinel that 
 - [x] `deviceMisc.customizeRegion` present for AP/gateway.
 - [x] Controller ID fetched from `GET /api/info`; use the factory sentinel to
       appear adoptable.
-- [x] Periodic UDP announce on port 29810.
-- [ ] TCP management client (port 29814): device-verify → negotiate →
-      init-sync → inform loop (OPEN).
+- [x] Periodic UDP announce on port 29810; keep the socket open to receive the
+      `PRE_ADOPT_REQUEST` reply, then stop announcing.
+- [x] TLS management client (port 29814): pre-connect → device-verify (mutual,
+      uppercase-hex auth) → negotiate → init-sync → inform loop → **Connected**.

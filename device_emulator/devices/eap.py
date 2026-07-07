@@ -18,6 +18,20 @@ class EapDevice(Device):
     def __post_init__(self) -> None:
         self.device_type = constants.DEVICE_TYPE_AP
 
+    def manage_device_info(self) -> dict[str, Any]:
+        return {
+            "name": self.name,
+            "model": self.identity.model,
+            "modelVersion": self.identity.model_version,
+            "firmwareVersion": self.identity.firmware_version,
+            "hardwareVersion": self.identity.hardware_version,
+            "upTime": str(self.uptime_seconds),
+            "cpuUti": self.cpu_util,
+            "memUti": self.mem_util,
+            "wirelessLinked": self.wireless_linked,
+            "p2p": False,
+        }
+
     def build_discovery_body(self) -> dict[str, Any]:
         assert self.controller_id is not None
         return build_ap_discovery_body(

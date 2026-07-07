@@ -6,7 +6,9 @@ deeper technical understanding.
 
 The project can emulate access point, switch, and gateway/router profiles and
 emit the UDP discovery traffic that makes an emulated device appear in a real
-network controller so it can be selected for adoption.
+network controller so it can be selected for adoption. With adoption enabled,
+it also completes the full management-channel handshake and keeps the device
+reported as **Connected** (online) with periodic heartbeats.
 
 ## Quick Start
 
@@ -29,10 +31,11 @@ cp config.example.yaml config.yaml
 ## Package Layout
 
 - `device_emulator/protocol/`: packet framing, message envelope, discovery
-  body builders.
+  body builders, management-channel handshake bodies, and the device auth
+  calculation.
 - `device_emulator/devices/`: base, access point, switch, gateway, registry.
-- `device_emulator/services/`: discovery announce, controller info client,
-  runner.
+- `device_emulator/services/`: discovery announce, TLS management client,
+  controller info client, runner.
 - `device_emulator/state.py`: persistence helpers.
 - `device_emulator/stats.py`: counters and synthetic runtime stats.
 
@@ -54,9 +57,14 @@ shared runner, and persists state snapshots when configured.
 
 Discovery (the UDP announce that makes a device appear as adoptable in the
 controller) is implemented and validated end-to-end for all three device
-types. The subsequent adoption/inform exchange over the TCP management
-channels is documented as an open area in
-[doc/DEVICE_PROTOCOL.md](doc/DEVICE_PROTOCOL.md) and is not yet implemented.
+types. Adoption over the TLS management channel (port 29814) — pre-connect,
+mutual device verification, capability negotiation, initial sync, and the
+steady-state inform/heartbeat loop that holds the device **Connected** — is
+implemented and validated end-to-end for access points; enable it via the
+`adopt:` block in the config. Switch/gateway discovery works, but their
+management-channel details are not separately confirmed. See
+[doc/DEVICE_PROTOCOL.md](doc/DEVICE_PROTOCOL.md) for the full protocol
+reference.
 
 ## Validation
 

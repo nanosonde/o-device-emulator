@@ -3,11 +3,13 @@
 # Copy this file to config.yaml and adjust for your lab environment, then run:
 #   .venv/bin/python device_emulator_daemon.py --config config.yaml --dry-run
 #
-# IMPORTANT: only the UDP discovery announce (port 29810) is confirmed working
-# against a real controller (see doc/DEVICE_PROTOCOL.md). The subsequent
-# adoption/inform exchange over the TCP channels is not yet implemented.
-# Announcing a device here makes it show up as "discovered" (adoptable) in the
-# controller, but completing adoption is not yet supported.
+# The UDP discovery announce (port 29810) makes a device show up as adoptable
+# ("Pending") in the controller. With the `adopt:` block below enabled, the
+# emulator also drives the full adoption handshake over the TLS management
+# channel and keeps the device "Connected" with periodic INFORM heartbeats
+# (see doc/DEVICE_PROTOCOL.md §8). The full adoption path is confirmed for
+# access points; switch/gateway discovery works but their management-channel
+# details are not separately confirmed.
 
 # The controller's management URL. Its host/port are used both to fetch the
 # controller's ID (GET <controller_url>/api/info, unauthenticated) and as the
@@ -30,6 +32,19 @@ services:
   # known ahead of time; direct unicast (the default) is simpler for lab use
   # and is what was used during protocol verification.
   discovery_broadcast: false
+
+# Adoption over the TLS management channel. When enabled, devices announce as
+# adoptable; once an operator adopts one in the controller, the emulator
+# completes the handshake to "Connected" and holds it online. The username /
+# password must match what the operator enters when adopting (the default
+# device credential is admin / admin).
+adopt:
+  enabled: false
+  username: admin
+  password: admin
+  port: 29814                     # management (adopt) TCP port
+  inform_interval: 10             # seconds between INFORM heartbeats once online
+
 
 devices:
   - name: lab-eap-01

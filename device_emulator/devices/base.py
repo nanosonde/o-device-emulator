@@ -64,6 +64,26 @@ class Device:
     def build_discovery_body(self) -> dict[str, Any]:
         raise NotImplementedError
 
+    def manage_device_info(self) -> dict[str, Any]:
+        """The deviceInfo object sent over the management channel during and
+        after adoption (negotiation + INFORM heartbeats).
+
+        CONFIRMED for access points; subclasses may override to adjust
+        per-type fields.
+        """
+        return {
+            "name": self.name,
+            "model": self.identity.model,
+            "modelVersion": self.identity.model_version,
+            "firmwareVersion": self.identity.firmware_version,
+            "hardwareVersion": self.identity.hardware_version,
+            "upTime": str(self.uptime_seconds),
+            "cpuUti": 5,
+            "memUti": 30,
+            "wirelessLinked": False,
+            "p2p": False,
+        }
+
     def build_discovery_message(self) -> DeviceMessage:
         if not self.controller_id:
             raise ValueError(

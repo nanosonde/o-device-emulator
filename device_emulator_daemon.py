@@ -42,6 +42,7 @@ def build_runner(config: dict[str, Any]) -> Runner:
         raise ValueError(f"could not parse host from controller_url: {controller_url!r}")
 
     services_cfg = config.get("services", {}) or {}
+    adopt_cfg = config.get("adopt", {}) or {}
     runner = Runner(
         controller_host=host,
         https_port=https_port,
@@ -49,6 +50,11 @@ def build_runner(config: dict[str, Any]) -> Runner:
         discovery_interval=services_cfg.get("discovery_interval", 10.0),
         discovery_bind_ip=services_cfg.get("discovery_bind_ip"),
         discovery_broadcast=services_cfg.get("discovery_broadcast", False),
+        adopt_enabled=adopt_cfg.get("enabled", False),
+        adopt_username=adopt_cfg.get("username", "admin"),
+        adopt_password=adopt_cfg.get("password", "admin"),
+        adopt_port=adopt_cfg.get("port", 29814),
+        inform_interval=adopt_cfg.get("inform_interval", 10.0),
     )
 
     devices_cfg = config.get("devices", []) or []
