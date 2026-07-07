@@ -48,6 +48,16 @@ def test_pre_connect_body():
     assert body["rebuild"] == 0
 
 
+def test_verify_nonce_is_36_char_uuid():
+    # Newer controllers (ECSP 1.7.x / controller v6.2) reject a
+    # randomKeyForSystemVerify shorter than 36 chars; a hyphenated UUID is 36.
+    nonce = adoption.new_verify_nonce()
+    assert len(nonce) == 36
+    assert nonce.count("-") == 4
+    # A fresh value each call.
+    assert nonce != adoption.new_verify_nonce()
+
+
 def test_device_verify_body():
     body = adoption.build_device_verify_body("AUTHTOKEN", "nonce123")
     assert body == {"auth": "AUTHTOKEN", "randomKeyForSystemVerify": "nonce123"}

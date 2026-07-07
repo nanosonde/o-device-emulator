@@ -31,7 +31,6 @@ import ssl
 import struct
 import threading
 import time
-import uuid
 from typing import Callable, Optional
 
 from ..devices.base import Device
@@ -187,7 +186,11 @@ class ManageService:
             return
         random_key = pre["body"]["randomKeyForDeviceVerify"]
         username = pre["body"].get("username") or self.username
-        device_nonce = uuid.uuid4().hex
+        # The device's own verify nonce. Must be a full 36-character hyphenated
+        # UUID: newer controllers (ECSP 1.7.x, e.g. controller v6.2) reject a
+        # randomKeyForSystemVerify shorter than 36 chars. Older controllers
+        # accept it too, so this is backward-compatible.
+        device_nonce = adoption.new_verify_nonce()
         self._send(
             sock,
             constants.MESSAGE_TYPE_DEVICE_VERIFY_INFO,

@@ -8,7 +8,19 @@ envelope but their per-type deviceInfo details are not separately confirmed.
 """
 from __future__ import annotations
 
+import uuid
 from typing import Any
+
+
+def new_verify_nonce() -> str:
+    """Return a fresh device verify nonce (`randomKeyForSystemVerify`).
+
+    Must be a full 36-character hyphenated UUID: newer controllers (ECSP
+    1.7.x, e.g. controller v6.2) reject a `randomKeyForSystemVerify` shorter
+    than 36 characters. A 36-char UUID is also accepted by older controllers,
+    so this is backward-compatible.
+    """
+    return str(uuid.uuid4())
 
 
 def build_pre_connect_body(rebuild: int = 0) -> dict[str, Any]:

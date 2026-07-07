@@ -6,7 +6,10 @@ by a network controller, as needed to re-implement an emulated device from
 scratch.
 
 Everything below was validated by sending packets to a live controller and
-observing its behavior. Each claim is tagged with its confidence level:
+observing its behavior. Discovery and the full adoption handshake are
+validated end-to-end against both **controller v5.15** (ECSP 1.3.7) and
+**controller v6.2** (ECSP 1.7.3). Each claim is tagged with its confidence
+level:
 
 - **CONFIRMED** — a packet built exactly as described was accepted by a real
   controller and produced the stated result.
@@ -338,8 +341,8 @@ controller-initiated messages echo the received `seq`.
 | # | Direction | `type` | Purpose |
 |---|-----------|--------|---------|
 | 1 | device → | `PRE_CONNECT_INFO` (3) | `{needUsername:true, rebuild:0}` |
-| 2 | ← device | `PRE_CONNECT_INFO_RESPONSE` (0x100000) | `{randomKeyForDeviceVerify, username}` |
-| 3 | device → | `DEVICE_VERIFY_INFO` (0x100001) | `{auth, randomKeyForSystemVerify}` |
+| 2 | ← device | `PRE_CONNECT_INFO_RESPONSE` (0x100000) | `{randomKeyForDeviceVerify, username}` (newer controllers also include `cipherCap`, e.g. `[4,5]`) |
+| 3 | device → | `DEVICE_VERIFY_INFO` (0x100001) | `{auth, randomKeyForSystemVerify}` — `randomKeyForSystemVerify` **must be a 36-char hyphenated UUID** (see §7.4) |
 | 4 | ← device | `DEVICE_VERIFY_RESPONSE` (0x100002) | `error==0` ⇒ controller authenticated the device (its body `auth` mutually authenticates the controller) |
 | 5 | device → | `SYSTEM_VERIFY_RESULT` (0x100003) | `{}` |
 | 6 | ← device | `VERIFY_RESULT_ACK` (0x100009) | mutual verification complete |
@@ -366,6 +369,22 @@ fed into the next hash (the controller's implementation uppercases its hex, and
 because the digests are hash *inputs*, casing changes the result). The default
 device credential is `admin` / `admin`; the username/password must match what
 the operator supplies when adopting.
+
+**`randomKeyForSystemVerify` length — CONFIRMED.** The device's own verify
+nonce must be a full **36-character hyphenated UUID**. Newer controllers
+(ECSP 1.7.x, e.g. controller v6.2) reject anything shorter than 36 characters
+(`INVALID_DEVICE_RANDOMKEY`) *before* checking the auth, so a 32-char hex
+string silently fails as "username or password incorrect". A 36-char UUID is
+accepted by older controllers too.
+
+**Controller-version compatibility — CONFIRMED.** The handshake above is
+validated end-to-end against both **controller v5.15** (ECSP 1.3.7) and
+**controller v6.2** (ECSP 1.7.3). The message sequence, the auth formula, and
+the uppercase-hex convention are identical across both; the only observable
+delta is the 36-char nonce enforcement above (and a new advertised
+`cipherCap` list — the default MD5 cipher path remains accepted, so no cipher
+negotiation is required). `DEVICE_VERIFY_RESPONSE` is compared
+case-insensitively on v6.2.
 
 **Summary of the confirmed lifecycle:**
 discovery announce (sentinel controller ID) → **PENDING** → operator adopts →
