@@ -20,9 +20,14 @@ MGMT_HTTP_PORT = 8088
 # dropped by the controller as "overdue discovery" (CONFIRMED).
 DISCOVERY_COOLDOWN_MS = 20000
 
-# Protocol version advertised in header.version (CONFIRMED format,
-# required field).
-PROTOCOL_VERSION = "2.0.0"
+# Protocol version advertised in header.version. The controller classifies the
+# device's ECSP protocol version as [major, minor] and compares it against the
+# per-device-type "fit" version it supports; a lower minor is flagged as
+# incompatible ("The device is not compatible with the current controller").
+# For an access point, both controller v5.15 and v6.2 expect EAP fit version
+# 2.3 (EcspFirstVersionEnum V2), so advertise "2.3.0" (major 2 / minor 3) to be
+# reported as compatible. verCap 3 = V1|V2 (keeps the device on the V2 branch).
+PROTOCOL_VERSION = "2.3.0"
 PROTOCOL_VER_CAP = 3
 
 # Device type strings for header.device (CONFIRMED via live discovery test

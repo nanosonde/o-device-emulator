@@ -84,6 +84,14 @@ class Device:
             "p2p": False,
         }
 
+    def manage_components_v2(self) -> dict[str, str]:
+        """The component manifest ({name: version}) reported during
+        negotiation. The controller treats an empty manifest as incompatible
+        (and shows a warning), so subclasses that support adoption return a
+        realistic, non-empty set. Empty by default.
+        """
+        return {}
+
     def build_discovery_message(self) -> DeviceMessage:
         if not self.controller_id:
             raise ValueError(

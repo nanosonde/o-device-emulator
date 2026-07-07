@@ -65,3 +65,21 @@ def test_discovery_message_requires_controller_id():
     device.controller_id = "6e4b42bfc99261c0e09bec9f8688d9c7"
     message = device.build_discovery_message()
     assert message.header.mac == device.mac
+
+
+def test_eap_reports_nonempty_components_v2():
+    # An empty component manifest makes the controller flag the AP as
+    # incompatible, so the emulated AP must report a non-empty set.
+    device = build_device(
+        {"name": "ap", "type": "ap", "model": "EAP245", "mac": "AA-BB-CC-DD-EE-01", "ip": "192.168.56.5"}
+    )
+    comps = device.manage_components_v2()
+    assert isinstance(comps, dict) and comps
+    assert comps.get("ssid")  # a representative component is present
+
+
+def test_switch_gateway_default_empty_components_v2():
+    switch = build_device(
+        {"name": "sw", "type": "switch", "model": "TL-SG3210", "mac": "AA-BB-CC-DD-EE-02", "ip": "192.168.56.6"}
+    )
+    assert switch.manage_components_v2() == {}

@@ -346,7 +346,7 @@ controller-initiated messages echo the received `seq`.
 | 4 | ← device | `DEVICE_VERIFY_RESPONSE` (0x100002) | `error==0` ⇒ controller authenticated the device (its body `auth` mutually authenticates the controller) |
 | 5 | device → | `SYSTEM_VERIFY_RESULT` (0x100003) | `{}` |
 | 6 | ← device | `VERIFY_RESULT_ACK` (0x100009) | mutual verification complete |
-| 7 | device → | `DEVICE_NEGOTIATION` (0x100004) | capabilities + `controllerSetting.controllerId` (the **real** controller ID) |
+| 7 | device → | `DEVICE_NEGOTIATION` (0x100004) | capabilities + `controllerSetting.controllerId` (the **real** controller ID) + a non-empty `components_v2` manifest (see §7.5) |
 | 8 | ← device | `SYSTEM_NEGOTIATION` (0x100005) | controller's negotiation reply |
 | 9 | device → | `INIT_SYNC_RESULT` (0x100006) | `{}` (echo seq) |
 | 10 | ← device | `INIT_SYNC_RESULT_ACK` (0x10000A) | device transitions to **Connected** |
@@ -385,6 +385,26 @@ delta is the 36-char nonce enforcement above (and a new advertised
 `cipherCap` list — the default MD5 cipher path remains accepted, so no cipher
 negotiation is required). `DEVICE_VERIFY_RESPONSE` is compared
 case-insensitively on v6.2.
+
+### 7.5 Being reported as "compatible" — CONFIRMED
+
+After adoption the controller marks a device **compatible** or shows a
+warning ("The device is not compatible with the current controller"). Two
+independent inputs drive this:
+
+- **Advertised protocol version.** The controller parses the device's ECSP
+  version into `[major, minor]` and compares it against the per-device-type
+  "fit" version it supports. For an access point, both v5.15 and v6.2 expect
+  EAP fit version **2.3**, so the device advertises `header.version = 2.3.0`
+  (major 2 / minor 3). A lower minor is logged as `LOW_MINOR_VER` and
+  contributes to the incompatible state.
+- **Component manifest.** The negotiation `components_v2` map
+  (`{componentName: version}`) must be **non-empty**: the controller builds a
+  component descriptor from it and treats an empty result as invalid
+  (compatibility value 7 = not manage-compatible). Reporting a realistic
+  manifest (the ~74 access-point components: `lan`, `wlanBasic`, `ssid`,
+  `portal`, `mesh`, `system`, ...) yields compatibility value 0 (fully
+  compatible) and clears the warning. CONFIRMED on both v5.15 and v6.2.
 
 **Summary of the confirmed lifecycle:**
 discovery announce (sentinel controller ID) → **PENDING** → operator adopts →

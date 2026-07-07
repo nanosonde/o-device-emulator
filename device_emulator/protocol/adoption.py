@@ -46,16 +46,23 @@ def build_negotiation_body(
     *,
     config_version: str = "0",
     country_code: int = 0,
+    components_v2: dict[str, str] | None = None,
 ) -> dict[str, Any]:
     """Device->controller negotiation message that carries the device's
-    capabilities and the controller id it is now managed by."""
+    capabilities and the controller id it is now managed by.
+
+    `components_v2` is the device's component manifest ({name: version}). The
+    controller flags a device with an empty manifest as incompatible, so a
+    realistic non-empty map should be supplied for the device to be reported
+    as compatible.
+    """
     return {
         "key": "",
         "configVersion": config_version,
         "deviceInfo": device_info,
         "controllerSetting": {"controllerId": controller_id},
         "components": "",
-        "components_v2": {},
+        "components_v2": components_v2 or {},
         "channelInfo": {},
         "radioCap": [],
         "devCap": {},

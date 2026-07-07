@@ -75,6 +75,14 @@ def test_negotiation_body_shape():
         assert key in body
 
 
+def test_negotiation_body_includes_components_v2():
+    # An empty component manifest makes the controller flag the device as
+    # incompatible; a supplied manifest must be carried through.
+    comps = {"lan": "1.0", "ssid": "2.3"}
+    body = adoption.build_negotiation_body({}, "cid", components_v2=comps)
+    assert body["components_v2"] == comps
+
+
 def test_inform_body_shape():
     info = {"name": "fake"}
     body = adoption.build_inform_body(info)

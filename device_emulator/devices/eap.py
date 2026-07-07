@@ -7,6 +7,7 @@ from typing import Any
 from ..protocol import constants
 from ..protocol.discovery import build_ap_discovery_body
 from .base import Device
+from .eap_components import EAP_COMPONENTS_V2
 
 
 @dataclass
@@ -31,6 +32,9 @@ class EapDevice(Device):
             "wirelessLinked": self.wireless_linked,
             "p2p": False,
         }
+
+    def manage_components_v2(self) -> dict[str, str]:
+        return dict(EAP_COMPONENTS_V2)
 
     def build_discovery_body(self) -> dict[str, Any]:
         assert self.controller_id is not None

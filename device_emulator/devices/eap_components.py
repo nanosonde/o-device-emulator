@@ -1,0 +1,91 @@
+"""Component manifest reported by an access point during negotiation.
+
+The controller flags a device as "not compatible" (and shows a warning) when
+the device reports an empty component set: the compatibility check builds a
+component descriptor from the negotiation's `components_v2` map and treats an
+empty result as invalid. Reporting a realistic, non-empty component manifest
+makes the controller consider the device compatible.
+
+This map mirrors the component/version set an EAP245(US) v3.0 reports (the
+component names are generic networking feature identifiers). It is used as the
+default `components_v2` for emulated access points.
+"""
+from __future__ import annotations
+
+# Access-point component manifest: {component name: component version}.
+EAP_COMPONENTS_V2: dict[str, str] = {
+    "abnormalDetect": "1.0",
+    "acl": "2.1",
+    "bSteerInform": "1.0",
+    "bandSteer": "1.1",
+    "binVlan": "1.0",
+    "channelDeploy": "1.0",
+    "clientAct": "1.1",
+    "clientConnectionInform": "1.0",
+    "clientInform": "2.0",
+    "clientRateLimit": "1.0",
+    "configVersion": "1.0",
+    "connRecInform": "1.0",
+    "controllerInfo": "1.1",
+    "devInform": "1.0",
+    "deviceDebugInfo": "1.0",
+    "dst": "1.0",
+    "facebookV2": "1.0",
+    "informInterval": "1.2",
+    "intfStatusInform": "1.0",
+    "ipGroup": "1.0",
+    "ipPortGroup": "1.0",
+    "ipv6Group": "1.0",
+    "ipv6PortGroup": "1.0",
+    "l3Access": "1.0",
+    "lan": "1.0",
+    "lanInform": "2.0",
+    "lanPort": "1.0",
+    "lanv6": "1.0",
+    "lb": "1.0",
+    "led": "1.0",
+    "lldp": "1.0",
+    "lldpInform": "1.0",
+    "log": "1.0",
+    "logInform": "2.0",
+    "mVlan": "1.0",
+    "macfilter": "2.0",
+    "mdns": "1.0",
+    "mesh": "1.1",
+    "meshInform": "2.0",
+    "packageCapture": "1.0",
+    "pfp": "1.0",
+    "ping": "1.0",
+    "portal": "2.0",
+    "portalAct": "2.0",
+    "powerControl": "1.0",
+    "privacyPolicy": "1.0",
+    "qos": "1.0",
+    "radioAccessInform": "1.0",
+    "reportInterval": "1.0",
+    "rfScan": "1.0",
+    "roamRecInform": "1.0",
+    "roaming": "1.1",
+    "roamingInform": "2.0",
+    "rogueAp": "3.0",
+    "rogueApInform": "2.0",
+    "rssiFilter": "1.0",
+    "scheduler": "2.0",
+    "service": "1.0",
+    "sideParams": "1.0",
+    "ssh": "1.0",
+    "ssid": "2.3",
+    "ssidInform": "2.0",
+    "ssidRateLimit": "2.1",
+    "system": "2.0",
+    "terminalSetting": "1.0",
+    "time": "1.0",
+    "traceroute": "1.0",
+    "transferChannel": "1.0",
+    "upgrade": "1.0",
+    "urlFiltering": "1.0",
+    "userAcnt": "1.0",
+    "wlanAdv": "1.0",
+    "wlanBasic": "2.0",
+    "wlanInform": "2.0",
+}

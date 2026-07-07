@@ -230,6 +230,7 @@ class ManageService:
                                 self.device.manage_device_info(),
                                 self.controller_id,
                                 country_code=self.device.country_code,
+                                components_v2=self.device.manage_components_v2(),
                             ),
                             seq=self._next_seq(),
                         )
