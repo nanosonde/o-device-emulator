@@ -8,8 +8,7 @@
 # emulator also drives the full adoption handshake over the TLS management
 # channel and keeps the device "Connected" with periodic INFORM heartbeats
 # (see doc/DEVICE_PROTOCOL.md §8). The full adoption path is confirmed for
-# access points; switch/gateway discovery works but their management-channel
-# details are not separately confirmed.
+# access points, switches, and gateways — each reported as compatible.
 
 # The controller's management URL. Its host/port are used both to fetch the
 # controller's ID (GET <controller_url>/api/info, unauthenticated) and as the
@@ -35,9 +34,10 @@ services:
 
 # Adoption over the TLS management channel. When enabled, devices announce as
 # adoptable; once an operator adopts one in the controller, the emulator
-# completes the handshake to "Connected" and holds it online. The username /
-# password must match what the operator enters when adopting (the default
-# device credential is admin / admin).
+# completes the handshake to "Connected" and holds it online. Access points,
+# switches, and gateways are all supported (each reported as compatible). The
+# username / password must match what the operator enters when adopting (the
+# default device credential is admin / admin).
 adopt:
   enabled: false
   username: admin

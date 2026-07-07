@@ -396,15 +396,24 @@ independent inputs drive this:
   version into `[major, minor]` and compares it against the per-device-type
   "fit" version it supports. For an access point, both v5.15 and v6.2 expect
   EAP fit version **2.3**, so the device advertises `header.version = 2.3.0`
-  (major 2 / minor 3). A lower minor is logged as `LOW_MINOR_VER` and
-  contributes to the incompatible state.
+  (major 2 / minor 3). **Switches and gateways** are classified at fit version
+  **2.2**, so they advertise `header.version = 2.2.0`. A wrong minor is logged
+  as `LOW_MINOR_VER` / `HIGH_MINOR_VER` and contributes to the incompatible
+  state.
 - **Component manifest.** The negotiation `components_v2` map
   (`{componentName: version}`) must be **non-empty**: the controller builds a
   component descriptor from it and treats an empty result as invalid
   (compatibility value 7 = not manage-compatible). Reporting a realistic
-  manifest (the ~74 access-point components: `lan`, `wlanBasic`, `ssid`,
-  `portal`, `mesh`, `system`, ...) yields compatibility value 0 (fully
+  per-type manifest (access-point components such as `wlanBasic`/`ssid`, or
+  the switch/gateway component sets) yields compatibility value 0 (fully
   compatible) and clears the warning. CONFIRMED on both v5.15 and v6.2.
+
+Each device type also sends its own negotiation shape: switches and gateways
+use short-name `deviceInfo` fields (`modelVer`/`fwVer`/`hwVer`/`time`/`cu`/`mu`
+plus type-specific identity fields) and carry a type-specific capability
+descriptor (`devCap` with port/spec info). All three device types \u2014 access
+point, switch, and gateway \u2014 are confirmed to reach **Connected** and
+**compatible** end-to-end.
 
 **Summary of the confirmed lifecycle:**
 discovery announce (sentinel controller ID) → **PENDING** → operator adopts →

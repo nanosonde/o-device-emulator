@@ -24,6 +24,15 @@ def _normalize_mac(mac: str) -> str:
     return cleaned
 
 
+def format_uptime(seconds: int) -> str:
+    """Format an uptime as "<N> days HH:MM:SS" (the form switches and gateways
+    report in their management-channel device info)."""
+    days, rem = divmod(max(0, seconds), 86400)
+    hours, rem = divmod(rem, 3600)
+    minutes, secs = divmod(rem, 60)
+    return f"{days} days {hours:02d}:{minutes:02d}:{secs:02d}"
+
+
 @dataclass
 class DeviceIdentity:
     name: str
@@ -45,6 +54,10 @@ class Device:
     identity: DeviceIdentity
     ip: str
     device_type: str = field(init=False, default="")
+    # ECSP protocol version advertised in header.version. The controller
+    # classifies this per device type; subclasses override it (access points
+    # use 2.3.0, switches/gateways use 2.2.0).
+    protocol_version: str = field(init=False, default=constants.PROTOCOL_VERSION)
     controller_id: Optional[str] = None
     uptime_start: float = field(default_factory=time.time)
     country_code: int = 0
@@ -92,6 +105,22 @@ class Device:
         """
         return {}
 
+    def build_manage_negotiation_body(self, controller_id: str) -> dict[str, Any]:
+        """The DEVICE_NEGOTIATION body sent over the management channel.
+
+        The base (access-point) shape carries the device info, the component
+        manifest, and empty capability placeholders. Switches and gateways
+        override this with their own device-info/capability shapes.
+        """
+        from ..protocol import adoption
+
+        return adoption.build_negotiation_body(
+            self.manage_device_info(),
+            controller_id,
+            country_code=self.country_code,
+            components_v2=self.manage_components_v2(),
+        )
+
     def build_discovery_message(self) -> DeviceMessage:
         if not self.controller_id:
             raise ValueError(
@@ -102,6 +131,7 @@ class Device:
             mac=self.mac,
             type=constants.MESSAGE_TYPE_DISCOVERY,
             device=self.device_type,
+            version=self.protocol_version,
         )
         body = self.build_discovery_body()
         return DeviceMessage(header=header, body=body)

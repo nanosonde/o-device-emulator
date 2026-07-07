@@ -78,8 +78,21 @@ def test_eap_reports_nonempty_components_v2():
     assert comps.get("ssid")  # a representative component is present
 
 
-def test_switch_gateway_default_empty_components_v2():
+def test_switch_and_gateway_report_components_and_v22_version():
+    # Switches and gateways also report a non-empty component manifest and are
+    # classified at ECSP protocol version 2.2 (APs use 2.3).
     switch = build_device(
         {"name": "sw", "type": "switch", "model": "TL-SG3210", "mac": "AA-BB-CC-DD-EE-02", "ip": "192.168.56.6"}
     )
-    assert switch.manage_components_v2() == {}
+    gateway = build_device(
+        {"name": "gw", "type": "gateway", "model": "ER605", "mac": "AA-BB-CC-DD-EE-03", "ip": "192.168.56.7"}
+    )
+    assert switch.manage_components_v2() and gateway.manage_components_v2()
+    assert switch.protocol_version == "2.2.0"
+    assert gateway.protocol_version == "2.2.0"
+    # Switch/gateway device info uses the short-name shape.
+    assert "modelVer" in switch.manage_device_info()
+    assert gateway.manage_device_info()["lanMac"] == "AA-BB-CC-DD-EE-03"
+    # Negotiation body carries the type-specific capability descriptor.
+    assert "devCap" in switch.build_manage_negotiation_body("cid")
+    assert "portInfos" in gateway.build_manage_negotiation_body("cid")["devCap"]

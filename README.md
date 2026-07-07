@@ -60,10 +60,10 @@ controller) is implemented and validated end-to-end for all three device
 types. Adoption over the TLS management channel (port 29814) — pre-connect,
 mutual device verification, capability negotiation, initial sync, and the
 steady-state inform/heartbeat loop that holds the device **Connected** — is
-implemented and validated end-to-end for access points; enable it via the
-`adopt:` block in the config. Switch/gateway discovery works, but their
-management-channel details are not separately confirmed. The discovery and
-adoption flows are validated against both controller v5.15 and v6.2. See
+implemented and validated end-to-end for **access points, switches, and
+gateways** (each reported as compatible, no warning). Enable it via the
+`adopt:` block in the config. The discovery and adoption flows are validated
+against both controller v5.15 and v6.2. See
 [doc/DEVICE_PROTOCOL.md](doc/DEVICE_PROTOCOL.md) for the full protocol
 reference.
 

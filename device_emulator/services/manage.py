@@ -85,7 +85,7 @@ class ManageService:
 
     def _frame(self, mtype: int, body: dict, seq: Optional[int], error: int) -> bytes:
         header = {
-            "version": constants.PROTOCOL_VERSION,
+            "version": self.device.protocol_version,
             "mac": self.device.mac,
             "type": mtype,
             "device": self.device.device_type,
@@ -226,12 +226,7 @@ class ManageService:
                         self._send(
                             sock,
                             constants.MESSAGE_TYPE_DEVICE_NEGOTIATION,
-                            adoption.build_negotiation_body(
-                                self.device.manage_device_info(),
-                                self.controller_id,
-                                country_code=self.device.country_code,
-                                components_v2=self.device.manage_components_v2(),
-                            ),
+                            self.device.build_manage_negotiation_body(self.controller_id),
                             seq=self._next_seq(),
                         )
                 elif mtype in (constants.MESSAGE_TYPE_SYSTEM_NEGOTIATION, constants.MESSAGE_TYPE_INIT_SYNC):
