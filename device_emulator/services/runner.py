@@ -9,6 +9,7 @@ from dataclasses import dataclass, field
 from typing import Any, Optional
 
 from ..devices.base import Device
+from ..devices.topology import LinkNeighbor, TopologyNeighbors
 from ..protocol import constants
 from .controller_client import ControllerInfoError, fetch_controller_id
 from .discovery import DiscoveryService, DiscoveryServiceConfig
@@ -129,6 +130,7 @@ class Runner:
     def start(self) -> None:
         self._stopped = False
         controller_id = self.resolve_controller_id()
+        self._resolve_topology()
         for device in self._devices:
             device.controller_id = (
                 constants.FACTORY_CONTROLLER_ID if self.adopt_enabled else controller_id
@@ -152,3 +154,45 @@ class Runner:
             service.stop()
         self._services.clear()
         self._discovery_by_mac.clear()
+
+    def _resolve_topology(self) -> None:
+        """Turn each device's declared ``uplink`` into concrete, bidirectional
+        neighbour links (so devices can report LLDP/port/FDB/lanInfo that let
+        the controller draw the topology map)."""
+        by_name = {d.name: d for d in self._devices}
+        downlink_counter: dict[str, int] = {}
+        for device in self._devices:
+            device.topology = TopologyNeighbors()
+        for device in self._devices:
+            if not device.uplink:
+                continue
+            parent = by_name.get(device.uplink)
+            if parent is None:
+                logger.warning(
+                    "device %s declares unknown uplink %r; skipping topology link",
+                    device.name,
+                    device.uplink,
+                )
+                continue
+            # Port on the parent facing this child (explicit or auto-assigned),
+            # and this child's own port facing the parent.
+            idx = downlink_counter.get(parent.name, 0) + 1
+            downlink_counter[parent.name] = idx
+            remote_port = device.uplink_port or idx
+            local_port = device.local_uplink_port or 1
+            device.topology.uplink = LinkNeighbor(
+                mac=parent.mac,
+                model=parent.identity.model,
+                device_type=parent.device_type,
+                local_port=local_port,
+                remote_port=remote_port,
+            )
+            parent.topology.downlinks.append(
+                LinkNeighbor(
+                    mac=device.mac,
+                    model=device.identity.model,
+                    device_type=device.device_type,
+                    local_port=remote_port,
+                    remote_port=local_port,
+                )
+            )

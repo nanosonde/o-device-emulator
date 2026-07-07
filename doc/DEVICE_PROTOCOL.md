@@ -421,6 +421,29 @@ discovery announce (sentinel controller ID) → **PENDING** → operator adopts 
 29814 → pre-connect → verify (mutual) → negotiate → init-sync →
 **CONNECTED** → periodic `INFORM_REQUEST` keeps it online.
 
+### 7.6 Topology map — CONFIRMED
+
+The controller draws the topology map (gateway → switch → access point) by
+correlating adjacency data the devices report in their periodic
+`INFORM_REQUEST`, keyed by component. A scheduled task rebuilds the successor
+tree, so links appear a short delay after the informs. Each device type
+reports different sections:
+
+- **Switch** — `port` (per-port link status; the connecting ports reported up),
+  `lldp` (per-port LLDP neighbour table: `{lldps:[{portId, standardOswPort,
+  neighbors:[{chassisId=<neighbour MAC>, portId, …}]}]}`), and `fdb` (MAC
+  forwarding table: `{fdbs:[{port, standardPort, macs:[{mac}]}]}`). A wired AP
+  is placed under the switch from the switch's LLDP/FDB entry for the AP's MAC.
+- **Gateway** — `portInfo` (LAN port up) and `lldp` (sees the switch). The
+  gateway is the topology root.
+- **Access point** — `lanInfo` (`{rate, duplex, port}`): its wired uplink port.
+  Without it the controller logs "Missing lan info for wired ap".
+
+The controller matches each LLDP neighbour's `chassisId` (a MAC) against a
+device node's MAC to create typed edges (`OsgOswEdge` gateway↔switch, `OswApEdge`
+switch↔AP). Gateway↔switch needs LLDP from **both** ends; the switch↔AP edge is
+built from the switch's LLDP/FDB plus the AP's `lanInfo`.
+
 ---
 
 ## 8. Reference constants (CONFIRMED)

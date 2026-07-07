@@ -55,6 +55,12 @@ devices:
     firmware: "5.1.0 Build 20230101 Rel.12345"
     mac: 02:15:6D:00:00:20
     ip: 192.168.56.53
+    # Wire the AP under the switch so it appears connected in the topology map.
+    # `uplink` is the name of the upstream device; `uplink_port` is the port on
+    # that upstream device this one plugs into (optional - auto-assigned if
+    # omitted). Leave `uplink` unset for a standalone device.
+    uplink: lab-switch-01
+    uplink_port: 8
 
   - name: lab-switch-01
     type: switch
@@ -65,6 +71,9 @@ devices:
     mac: 02:15:6D:00:00:10
     ip: 192.168.56.60
     port_num: 10
+    # The switch plugs into the gateway (topology root).
+    uplink: lab-gateway-01
+    uplink_port: 5
 
   - name: lab-gateway-01
     type: gateway

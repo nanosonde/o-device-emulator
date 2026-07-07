@@ -15,6 +15,7 @@ from typing import Any, Optional
 from ..protocol import constants
 from ..protocol.discovery import build_discovery_body
 from ..protocol.messages import DeviceMessage, MessageHeader
+from .topology import TopologyNeighbors
 
 
 def _normalize_mac(mac: str) -> str:
@@ -62,6 +63,14 @@ class Device:
     uptime_start: float = field(default_factory=time.time)
     country_code: int = 0
 
+    # Topology wiring (optional). ``uplink``/``uplink_port``/``local_uplink_port``
+    # come from config; ``topology`` is resolved by the runner into the concrete
+    # neighbour set used to report LLDP/port/FDB/lanInfo (see devices/topology.py).
+    uplink: Optional[str] = None
+    uplink_port: Optional[int] = None
+    local_uplink_port: Optional[int] = None
+    topology: TopologyNeighbors = field(init=False, default_factory=TopologyNeighbors)
+
     @property
     def mac(self) -> str:
         return _normalize_mac(self.identity.mac)
@@ -92,6 +101,14 @@ class Device:
         negotiation. The controller treats an empty manifest as incompatible
         (and shows a warning), so subclasses that support adoption return a
         realistic, non-empty set. Empty by default.
+        """
+        return {}
+
+    def manage_inform_extra(self) -> dict[str, Any]:
+        """Extra keyed sections merged into the periodic INFORM body (on top of
+        ``deviceInfo``/``configVersion``). Wired devices use this to report the
+        ``port`` link status and ``lldp`` neighbour table that drive the
+        controller's topology map. Empty by default.
         """
         return {}
 

@@ -260,10 +260,12 @@ class ManageService:
                 now = time.monotonic()
                 if now - last_inform >= self.inform_interval:
                     last_inform = now
+                    inform_body = adoption.build_inform_body(self.device.manage_device_info())
+                    inform_body.update(self.device.manage_inform_extra())
                     self._send(
                         sock,
                         constants.MESSAGE_TYPE_INFORM_REQUEST,
-                        adoption.build_inform_body(self.device.manage_device_info()),
+                        inform_body,
                         seq=self._next_seq(),
                     )
 

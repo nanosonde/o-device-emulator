@@ -6,7 +6,7 @@ from typing import Any
 
 from ..protocol import constants
 from ..protocol.discovery import build_gateway_discovery_body
-from . import gateway_profile
+from . import gateway_profile, topology
 from .wired import WiredDevice
 
 
@@ -39,6 +39,18 @@ class GatewayDevice(WiredDevice):
     def __post_init__(self) -> None:
         self.device_type = constants.DEVICE_TYPE_GATEWAY
         self._apply_wired_profile()
+
+    def manage_inform_extra(self) -> dict[str, Any]:
+        # Report LAN port link status and the LLDP neighbour table for every
+        # wired link (a gateway is the topology root - it reports its
+        # downlinks).
+        links = self.topology.all_links()
+        if not links:
+            return {}
+        extra: dict[str, Any] = {}
+        extra.update(topology.gateway_port_section(links, self.mac))
+        extra.update(topology.lldp_section(links))
+        return extra
 
     def build_discovery_body(self) -> dict[str, Any]:
         assert self.controller_id is not None

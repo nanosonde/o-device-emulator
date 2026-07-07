@@ -58,6 +58,9 @@ def build_device(cfg: dict[str, Any]) -> Device:
         "identity": identity,
         "ip": ip,
         "country_code": cfg.get("country_code", 0),
+        "uplink": cfg.get("uplink"),
+        "uplink_port": cfg.get("uplink_port"),
+        "local_uplink_port": cfg.get("local_uplink_port"),
     }
     if device_cls is SwitchDevice:
         kwargs["port_num"] = cfg.get("port_num", 8)

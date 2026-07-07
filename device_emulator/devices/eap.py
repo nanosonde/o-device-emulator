@@ -6,7 +6,7 @@ from typing import Any
 
 from ..protocol import constants
 from ..protocol.discovery import build_ap_discovery_body
-from . import eap_profile
+from . import eap_profile, topology
 from .base import Device
 
 
@@ -19,6 +19,13 @@ class EapDevice(Device):
     def __post_init__(self) -> None:
         self.device_type = constants.DEVICE_TYPE_AP
         self.protocol_version = eap_profile.PROTOCOL_VERSION
+
+    def manage_inform_extra(self) -> dict[str, Any]:
+        # Report the wired uplink port so the controller places the AP under
+        # its switch in the topology map.
+        if self.topology.uplink is not None:
+            return topology.ap_lan_info_section(self.topology.uplink)
+        return {}
 
     def manage_device_info(self) -> dict[str, Any]:
         # Access points use the long-name deviceInfo field set.

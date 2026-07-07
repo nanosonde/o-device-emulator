@@ -8,7 +8,9 @@ The project can emulate access point, switch, and gateway/router profiles and
 emit the UDP discovery traffic that makes an emulated device appear in a real
 network controller so it can be selected for adoption. With adoption enabled,
 it also completes the full management-channel handshake and keeps the device
-reported as **Connected** (online) with periodic heartbeats.
+reported as **Connected** (online) with periodic heartbeats, and can report a
+wired **topology** (declare each device's `uplink`) so the devices appear
+connected in the controller's topology map.
 
 ## Quick Start
 
@@ -34,8 +36,8 @@ cp config.example.yaml config.yaml
   body builders, management-channel handshake bodies, and the device auth
   calculation.
 - `device_emulator/devices/`: device model (`base` + `wired` bases; `eap`,
-  `switch`, `gateway` types; `registry`), plus per-type negotiation profiles
-  (`eap_profile`, `switch_profile`, `gateway_profile`).
+  `switch`, `gateway` types; `registry`; `topology` reporting), plus per-type
+  negotiation profiles (`eap_profile`, `switch_profile`, `gateway_profile`).
 - `device_emulator/services/`: discovery announce, TLS management client,
   controller info client, runner.
 - `device_emulator/state.py`: persistence helpers.
